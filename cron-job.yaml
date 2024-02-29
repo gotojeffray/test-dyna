@@ -1,0 +1,104 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: {{ include "standard-cronjob.fullname" . }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    {{- include "standard-cronjob.labels" . | nindent 4 }}
+spec:
+  schedule: "{{ .Values.app.schedule }}"
+  concurrencyPolicy: {{ .Values.app.concurrencyPolicy }}
+  startingDeadlineSeconds: {{ default 1200 .Values.app.startingDeadlineSeconds }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.app.backoffLimit }}
+      activeDeadlineSeconds: {{ default 86400 .Values.app.activeDeadlineSeconds }} # Defaults to 24h
+      template:
+        metadata:
+        {{- with .Values.podAnnotations }}
+          annotations:
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
+          labels:
+            {{- include "standard-cronjob.selectorLabels" . | nindent 12 }}
+        spec:
+          containers:
+          - name: {{ .Values.app.name }}
+            image: "{{ .Values.app.container.repository }}{{ .Values.app.container.image }}:{{ tpl .Values.app.container.tag . }}"
+            {{- if .Values.app.container.command }}
+            command: [ {{ .Values.app.container.command }} ]
+            {{- end }}
+            {{- if .Values.app.container.args }}
+            args: {{ toYaml .Values.app.container.args | nindent 12 }}
+            {{- end }}
+            imagePullPolicy: {{ .Values.app.container.pullPolicy }}
+            {{- if .Values.app.container.securityContext }}
+            securityContext: {{ toYaml .Values.app.container.securityContext | nindent 14 }}
+            {{- end }}
+            resources: {{- toYaml .Values.app.container.resources | nindent 14 }}
+             {{- if .Values.app.env }}
+            env:
+            {{- with .Values.app.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }} 
+            {{- end }} 
+            {{- if .Values.app.enableSecretInjection }}
+            {{- range $secret := .Values.app.secrets }}
+            - name: {{ $secret.envVariableName }}
+              value: {{ include "standard-cronjob.secretname" (merge . $) }}@azurekeyvault
+            {{- end }}
+            {{- end }}
+            {{- if not .Values.app.enableSecretInjection }}
+            envFrom:
+              {{- if eq .Values.localdevelopment.enabled false }}
+              {{- range $secret := .Values.app.secrets }}
+              - secretRef:
+                  name: {{ $secret.kvKey }}
+              {{- end }}
+              {{- end }}
+            {{- end }}
+            {{- if .Values.app.mountSecrets }}
+            {{- range $secret := .Values.app.mountSecrets }}
+              - secretRef:
+                 name: {{ $secret.k8sSecretName }}
+            {{- end }}
+            {{- end }}
+            {{- if or (.Values.app.fileSecrets) (.Values.app.timezone) }}
+            volumeMounts:
+            {{- range $secret := .Values.app.fileSecrets }}
+              - name: {{ $secret.kvKey }}
+                mountPath: {{ $secret.mountPath }}
+                readOnly: true
+            {{- end }}
+            {{- if .Values.app.timezone }}
+            - name: tz-{{ lower .Values.app.timezone }}
+              mountPath: /etc/localtime
+            {{- end }}
+            {{- end }}
+          {{- if .Values.app.fileSecrets }}
+          volumes:
+          {{- range $secret := .Values.app.fileSecrets }}
+          - name: {{ $secret.kvKey }}
+            secret:
+              secretName: {{ $secret.kvKey }}
+          {{- end }}
+          {{- end }}
+          restartPolicy: {{ .Values.app.restartPolicy }}
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+          {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity:
+          {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+          {{- if .Values.app.timezone }}
+          volumes:
+          - name: tz-{{ lower .Values.app.timezone }}
+            hostPath:
+              path: /usr/share/zoneinfo/{{ upper .Values.app.timezone }}
+          {{- end }}
