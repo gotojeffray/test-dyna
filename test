@@ -1,0 +1,45 @@
+import os
+import random
+import string
+from azure.eventhub import EventHubProducerClient, EventData
+from azure.identity import ClientSecretCredential
+
+# Read environment variables
+tenant_id = os.getenv('AZURE_TENANT_ID')
+client_id = os.getenv('AZURE_CLIENT_ID')
+client_secret = os.getenv('AZURE_CLIENT_SECRET')
+eventhub_namespace = os.getenv('EVENTHUB_NAMESPACE')
+eventhub_name = os.getenv('EVENTHUB_NAME')
+
+# Create credential
+credential = ClientSecretCredential(
+    tenant_id=tenant_id,
+    client_id=client_id,
+    client_secret=client_secret
+)
+
+# Create Event Hub client
+producer = EventHubProducerClient(
+    fully_qualified_namespace=f"{eventhub_namespace}.servicebus.windows.net",
+    eventhub_name=eventhub_name,
+    credential=credential
+)
+
+# Generate random data
+def generate_random_data():
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=20))
+
+# Send message
+message_id = "1234567"
+name = "John Doe"
+random_data = generate_random_data()
+
+message = f"{message_id}, {name}, {random_data}"
+
+try:
+    with producer:
+        event_data = EventData(message)
+        producer.send_event(event_data)
+    print(f"✅ Message sent: {message}")
+except Exception as e:
+    print(f"❌ Error: {e}")
