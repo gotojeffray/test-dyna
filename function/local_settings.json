@@ -1,0 +1,13 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "EventHubConnection__fullyQualifiedNamespace": "your-eventhub-namespace.servicebus.windows.net",
+    "STORAGE_ACCOUNT_NAME": "yourstorageaccountname",
+    "EVENTHUB_NAMESPACE": "your-eventhub-namespace",
+    "EVENTHUB_NAME": "your-eventhub-name",
+    "FLUSH_INTERVAL_SECONDS": "300",
+    "MAX_LINES_PER_FLUSH": "1000"
+  }
+}
